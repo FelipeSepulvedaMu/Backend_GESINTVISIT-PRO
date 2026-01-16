@@ -4,7 +4,7 @@ import { sendNotificationEmail } from '../../commons/email';
 
 export class VisitService {
   async createVisit(data: any) {
-    console.log("[VisitService] 📝 Guardando visita para casa:", data.houseNumber);
+    console.log("[VisitService] 📝 Registro en DB para casa:", data.houseNumber);
 
     const payload = {
       date: data.date, 
@@ -30,13 +30,11 @@ export class VisitService {
     const createdVisit = newVisits?.[0];
     
     if (createdVisit) {
-      console.log("[VisitService] ✅ Registro OK. Notificando...");
-      // Notificación asíncrona total
-      setTimeout(() => {
-        this.notifyResident(data).catch(err => 
-          console.error("[VisitService] ❌ Error background email:", err)
-        );
-      }, 0);
+      // Disparamos la notificación y seguimos adelante
+      console.log("[VisitService] ✅ Registro OK. Notificando en background...");
+      this.notifyResident(data).catch(err => 
+        console.error("[VisitService] ❌ Falló notificación background:", err.message)
+      );
     }
 
     return createdVisit;
@@ -50,27 +48,39 @@ export class VisitService {
       .maybeSingle();
 
     if (error || !house?.email) {
-      console.log(`[VisitService] ⚠️ No se enviará correo (Sin email o error DB).`);
+      console.warn(`[VisitService] ⚠️ Abortado: Casa ${visit.houseNumber} no tiene email o hubo error DB.`);
       return;
     }
 
     const html = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; padding: 20px;">
-        <h2 style="color: #1e293b;">Aviso de Ingreso</h2>
-        <p>Hola <b>${house.owner_name}</b>, se registró un ingreso:</p>
-        <hr/>
-        <p><b>Visitante:</b> ${visit.visitorName}</p>
-        <p><b>RUT:</b> ${visit.visitorRut}</p>
-        <p><b>Tipo:</b> ${visit.type}</p>
-        ${visit.plate ? `<p><b>Patente:</b> ${visit.plate}</p>` : ''}
-        <hr/>
-        <p style="font-size: 11px; color: #666;">Registrado por ${visit.conciergeName}</p>
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; font-size: 16px;">
+        <div style="background-color: #1e293b; color: white; padding: 25px; text-align: center;">
+          <h2 style="margin: 0; font-size: 20px;">Aviso de Ingreso Registrado</h2>
+        </div>
+        <div style="padding: 30px; color: #334155; line-height: 1.5;">
+          <p>Estimado/a <strong>${house.owner_name}</strong>,</p>
+          <p>Le informamos que se ha registrado un ingreso a su domicilio (<b>Casa ${house.number}</b>):</p>
+          
+          <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Visitante:</strong> ${visit.visitorName}</p>
+            <p style="margin: 5px 0;"><strong>RUT:</strong> ${visit.visitorRut}</p>
+            <p style="margin: 5px 0;"><strong>Tipo:</strong> ${visit.type.toUpperCase()}</p>
+            ${visit.plate ? `<p style="margin: 5px 0;"><strong>Patente:</strong> ${visit.plate}</p>` : ''}
+          </div>
+          
+          <p style="font-size: 13px; color: #64748b;">
+            Registrado por conserjería: <strong>${visit.conciergeName}</strong>.
+          </p>
+        </div>
+        <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #94a3b8;">
+          SISTEMA GESINTVISIT PRO - Gestión de Accesos
+        </div>
       </div>
     `;
 
     await sendNotificationEmail(
       house.email, 
-      `Ingreso Casa ${house.number}: ${visit.visitorName}`, 
+      `Ingreso registrado: ${visit.visitorName} (Casa ${house.number})`, 
       html
     );
   }
