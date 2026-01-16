@@ -4,7 +4,7 @@ import { sendNotificationEmail } from '../../commons/email';
 
 export class VisitService {
   async createVisit(data: any) {
-    console.log("[VisitService] Recibiendo datos para registrar:", data);
+    console.log("[VisitService] 📝 Iniciando registro para casa:", data.houseNumber);
 
     const payload = {
       date: data.date, 
@@ -23,50 +23,77 @@ export class VisitService {
       .select();
 
     if (error) {
-      console.error("[VisitService] Error de Supabase:", error.message);
+      console.error("[VisitService] ❌ Error Supabase:", error.message);
       throw new Error(`Base de datos: ${error.message}`);
     }
 
-    if (!newVisits || newVisits.length === 0) {
-      throw new Error("No se pudo confirmar la creación del registro");
+    const createdVisit = newVisits?.[0];
+    
+    if (createdVisit) {
+      console.log("[VisitService] ✅ Registro guardado en DB. Iniciando notificación...");
+      // Notificar sin esperar (background)
+      this.notifyResident(data).catch(err => 
+        console.error("[VisitService] ❌ Error fatal en notifyResident:", err)
+      );
     }
-
-    const createdVisit = newVisits[0];
-
-    // Envío de correo
-    this.notifyResident(data).catch(err => console.error("[VisitService] Error enviando email:", err.message));
 
     return createdVisit;
   }
 
   private async notifyResident(visit: any) {
-    const { data: house } = await supabase
+    const { data: house, error } = await supabase
       .from('houses')
-      .select('email, number')
+      .select('email, owner_email, number, owner_name')
       .eq('number', visit.houseNumber)
       .maybeSingle();
 
-    if (house?.email) {
-      const html = `
-        <div style="font-family: sans-serif; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; max-width: 600px; margin: auto;">
-          <h2 style="color: #0f172a; margin-top: 0;">Aviso de Ingreso Registrado</h2>
-          <p style="color: #64748b; font-size: 16px;">Hola, se ha registrado un ingreso a la <b>Casa ${house.number}</b>.</p>
-          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><b>Tipo:</b> ${visit.type === 'visita' ? 'Visita Personal' : 'Entrega de Paquete'}</p>
-            <p style="margin: 5px 0;"><b>Visitante:</b> ${visit.visitorName}</p>
-            <p style="margin: 5px 0;"><b>RUT:</b> ${visit.visitorRut}</p>
-            ${visit.plate ? `<p style="margin: 5px 0;"><b>Patente Vehículo:</b> ${visit.plate}</p>` : ''}
-            <p style="margin: 5px 0;"><b>Fecha/Hora:</b> ${new Date(visit.date).toLocaleString('es-CL')}</p>
-          </div>
-          <p style="color: #94a3b8; font-size: 12px; margin-bottom: 0;">Este es un mensaje automático del sistema GESINTVISIT PRO.</p>
+    if (error) {
+      console.error("[VisitService] ❌ Error consultando casa:", error.message);
+      return;
+    }
+
+    const targetEmail = house?.email || house?.owner_email;
+
+    if (!targetEmail) {
+      console.warn(`[VisitService] ⚠️ No hay email para la casa ${visit.houseNumber}.`);
+      return;
+    }
+
+    console.log(`[VisitService] 📧 Preparando envío para: ${targetEmail}`);
+
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+        <div style="background-color: #1e293b; color: white; padding: 20px; text-align: center;">
+          <h2 style="margin: 0;">Aviso de Ingreso</h2>
         </div>
-      `;
-      await sendNotificationEmail(house.email, `Control de Acceso: Ingreso registrado Casa ${house.number}`, html);
+        <div style="padding: 20px; color: #334155;">
+          <p>Se ha registrado un ingreso a la <b>Casa ${house.number}</b>:</p>
+          <ul style="list-style: none; padding: 0;">
+            <li><b>Visitante:</b> ${visit.visitorName}</li>
+            <li><b>RUT:</b> ${visit.visitorRut}</li>
+            <li><b>Tipo:</b> ${visit.type}</li>
+            ${visit.plate ? `<li><b>Patente:</b> ${visit.plate}</li>` : ''}
+          </ul>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94a3b8;">Registrado por ${visit.conciergeName}</p>
+        </div>
+      </div>
+    `;
+
+    const success = await sendNotificationEmail(
+      targetEmail, 
+      `Ingreso registrado: Casa ${house.number}`, 
+      html
+    );
+
+    if (success) {
+      console.log(`[VisitService] ✨ Proceso de notificación completado para ${targetEmail}`);
+    } else {
+      console.error(`[VisitService] 💔 El correo no pudo ser enviado a ${targetEmail}`);
     }
   }
 
   async getVisitsByDate(date: string) {
-    // FIX: Filtramos por el string literal de la fecha para evitar desfases de zona horaria del servidor
     const { data, error } = await supabase
       .from('visits')
       .select('*')
