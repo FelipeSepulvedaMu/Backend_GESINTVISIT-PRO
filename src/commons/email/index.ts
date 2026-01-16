@@ -7,50 +7,47 @@ dotenv.config();
 const GMAIL_USER = (process.env.GMAIL_USER || '').trim();
 const GMAIL_PASS = (process.env.GMAIL_PASS || '').replace(/\s+/g, '');
 
+/**
+ * Configuramos el transporte usando el shortcut 'service: gmail'.
+ * Nodemailer ya sabe qué puertos y hosts usar internamente.
+ * Agregamos un pool para mantener la conexión abierta si es posible.
+ */
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // false para puerto 587 (STARTTLS)
+  service: 'gmail',
   auth: {
     user: GMAIL_USER,
     pass: GMAIL_PASS,
   },
-  // Configuración de seguridad para STARTTLS
-  tls: {
-    ciphers: 'SSLv3',
-    rejectUnauthorized: false
-  },
-  // Tiempos de espera aún más cortos para detectar fallos rápido
-  connectionTimeout: 5000,
-  greetingTimeout: 5000,
-  socketTimeout: 5000,
+  pool: true, // Reutiliza conexiones para mejorar rendimiento
+  maxConnections: 1,
+  connectionTimeout: 20000, // 20 segundos para entornos lentos como Render
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
   debug: true, 
   logger: true
 });
 
 export const verifyEmailConfig = async () => {
   try {
-    console.log('[EmailService] 🔍 Verificando conexión en puerto 587...');
+    console.log('[EmailService] 🔍 Probando configuración optimizada de Gmail...');
     
     if (!GMAIL_USER || !GMAIL_PASS) {
-      console.error('[EmailService] ❌ Faltan credenciales GMAIL_USER o GMAIL_PASS.');
+      console.error('[EmailService] ❌ Faltan credenciales.');
       return false;
     }
 
-    // El método verify() intenta establecer la conexión completa
     await transporter.verify();
-    console.log('[EmailService] ✅ Conexión SMTP puerto 587 establecida y autenticada.');
+    console.log('[EmailService] ✅ Conexión verificada exitosamente.');
     return true;
   } catch (error: any) {
-    console.error('[EmailService] ❌ Falló la verificación SMTP:');
-    console.error(`   Mensaje: ${error.message}`);
+    console.error('[EmailService] ❌ Error de verificación:', error.message);
     return false;
   }
 };
 
 export const sendNotificationEmail = async (to: string, subject: string, html: string) => {
   try {
-    console.log(`[EmailService] 📤 Enviando mail a: ${to} (Puerto 587)...`);
+    console.log(`[EmailService] 📧 Enviando notificación a: ${to}...`);
     
     const info = await transporter.sendMail({
       from: `"GESINTVISIT PRO" <${GMAIL_USER}>`,
@@ -59,11 +56,14 @@ export const sendNotificationEmail = async (to: string, subject: string, html: s
       html,
     });
 
-    console.log(`[EmailService] ✅ Mail enviado! ID: ${info.messageId}`);
+    console.log(`[EmailService] ✨ Correo enviado con éxito (ID: ${info.messageId})`);
     return true;
   } catch (error: any) {
-    console.error('[EmailService] ❌ Error enviando mail:');
-    console.error(`   Detalle: ${error.message}`);
+    console.error('[EmailService] ❌ Error crítico al enviar:', error.message);
+    // Si falla por timeout, damos un consejo específico en el log
+    if (error.message.includes('timeout')) {
+      console.error('   👉 Render está tardando demasiado en conectar. Intenta nuevamente.');
+    }
     return false;
   }
 };
