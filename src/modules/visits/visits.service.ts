@@ -6,9 +6,8 @@ export class VisitService {
   async createVisit(data: any) {
     console.log("[VisitService] Recibiendo datos para registrar:", data);
 
-    // Mapeo explícito a los nombres de columna de tu tabla en Supabase
     const payload = {
-      date: data.date,
+      date: data.date, 
       house_number: data.houseNumber,
       resident_name: data.residentName,
       type: data.type,
@@ -24,7 +23,7 @@ export class VisitService {
       .select();
 
     if (error) {
-      console.error("[VisitService] Error de Supabase:", error.message, error.details);
+      console.error("[VisitService] Error de Supabase:", error.message);
       throw new Error(`Base de datos: ${error.message}`);
     }
 
@@ -34,7 +33,7 @@ export class VisitService {
 
     const createdVisit = newVisits[0];
 
-    // Envío de correo (No bloquea el registro si falla)
+    // Envío de correo
     this.notifyResident(data).catch(err => console.error("[VisitService] Error enviando email:", err.message));
 
     return createdVisit;
@@ -43,7 +42,6 @@ export class VisitService {
   private async notifyResident(visit: any) {
     const { data: house } = await supabase
       .from('houses')
-      // Se cambia 'owner_email' por 'email' según el esquema de la tabla
       .select('email, number')
       .eq('number', visit.houseNumber)
       .maybeSingle();
@@ -68,11 +66,12 @@ export class VisitService {
   }
 
   async getVisitsByDate(date: string) {
+    // FIX: Filtramos por el string literal de la fecha para evitar desfases de zona horaria del servidor
     const { data, error } = await supabase
       .from('visits')
       .select('*')
-      .gte('date', `${date}T00:00:00Z`)
-      .lte('date', `${date}T23:59:59Z`)
+      .gte('date', `${date}T00:00:00`)
+      .lte('date', `${date}T23:59:59`)
       .order('date', { ascending: false });
     
     if (error) throw error;
