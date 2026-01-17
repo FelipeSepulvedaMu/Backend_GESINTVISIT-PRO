@@ -30,7 +30,6 @@ export class VisitService {
     const createdVisit = newVisits?.[0];
     
     if (createdVisit) {
-      // Disparamos la notificación y seguimos adelante
       console.log("[VisitService] ✅ Registro OK. Notificando en background...");
       this.notifyResident(data).catch(err => 
         console.error("[VisitService] ❌ Falló notificación background:", err.message)
@@ -86,11 +85,24 @@ export class VisitService {
   }
 
   async getVisitsByDate(date: string) {
+    // Calculamos un rango de 3 días (ayer, hoy, mañana) para capturar 
+    // cualquier registro que por UTC pueda haber quedado fuera.
+    const requestedDate = new Date(date);
+    
+    const yesterday = new Date(requestedDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const tomorrow = new Date(requestedDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const startStr = yesterday.toISOString().split('T')[0] + 'T00:00:00.000Z';
+    const endStr = tomorrow.toISOString().split('T')[0] + 'T23:59:59.999Z';
+
     const { data, error } = await supabase
       .from('visits')
       .select('*')
-      .gte('date', `${date}T00:00:00`)
-      .lte('date', `${date}T23:59:59`)
+      .gte('date', startStr)
+      .lte('date', endStr)
       .order('date', { ascending: false });
     
     if (error) throw error;
