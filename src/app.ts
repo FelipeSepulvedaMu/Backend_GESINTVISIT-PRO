@@ -4,8 +4,9 @@ import { router as routes } from './routes';
 
 const app = express();
 
+// CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || '*', // si no existe, permite cualquier origen
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
