@@ -109,6 +109,24 @@ export class VisitService {
     return data || [];
   }
 
+  async markExit(id: string) {
+    const exitTime = new Date().toISOString();
+    
+    const { data, error } = await supabase
+      .from('visits')
+      .update({ exit_time: exitTime })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[VisitService] ❌ Error al marcar salida:", error.message);
+      throw new Error(`DB Error: ${error.message}`);
+    }
+
+    return data;
+  }
+
   async getHouses() {
     const { data, error } = await supabase
       .from('houses')
