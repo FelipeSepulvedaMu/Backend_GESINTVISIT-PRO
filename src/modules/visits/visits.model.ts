@@ -10,6 +10,7 @@ export interface Visit {
   visitorRut: string;
   plate?: string;
   conciergeName: string;
+  exitTime?: Date | string;
   createdAt?: Date;
 }
 

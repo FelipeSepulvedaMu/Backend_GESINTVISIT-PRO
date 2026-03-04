@@ -24,6 +24,17 @@ export const getVisits = async (req: any, res: any) => {
   }
 };
 
+export const markExit = async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const visit = await visitService.markExit(id);
+    res.json(visit);
+  } catch (error: any) {
+    console.error("[VisitsController] Error marking exit:", error.message);
+    res.status(400).json({ error: error.message || 'Error al marcar salida' });
+  }
+};
+
 export const getHouses = async (_: any, res: any) => {
   try {
     const houses = await visitService.getHouses();
