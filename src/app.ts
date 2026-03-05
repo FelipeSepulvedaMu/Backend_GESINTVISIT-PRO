@@ -6,7 +6,7 @@ const app = express();
 
 // CORS: solo permite tu frontend en Vercel
 app.use(cors({
-  origin: '*', // permite cualquier origen temporalmente
+  origin: 'https://gesintvisit-pro.vercel.app', // tu URL real
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
