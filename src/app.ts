@@ -6,7 +6,7 @@ const app = express();
 
 // CORS: solo permite tu frontend en Vercel
 app.use(cors({
-  origin: process.env.FRONTEND_URL, // toma la URL desde el .env
+  origin: '*', // permite cualquier origen temporalmente
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
